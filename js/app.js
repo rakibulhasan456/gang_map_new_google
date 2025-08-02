@@ -1,3 +1,39 @@
+// Helper function to download JSON
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'data.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Function to open sidebar with area data
+function openSidebar(locationModel) {
+  const currentData = locationModel.toJSON();
+  
+  // Populate form fields
+  document.getElementById('area-name').value = currentData.title;
+  document.getElementById('area-notes').value = currentData.notes || '';
+  
+  // Populate gang selector
+  const gangSelector = document.getElementById('gang-selector');
+  gangSelector.innerHTML = gangs.map(gang => 
+    `<option value="${gang.color}" ${currentData.fillcolor === gang.color ? 'selected' : ''}>
+      ${gang.name}
+    </option>`
+  ).join('');
+  
+  // Store current location model
+  sidebar.dataset.locationId = locationModel.cid;
+  
+  // Open sidebar
+  document.getElementById('sidebar').classList.add('open');
+}
+
 $(function () {
 	var showCoordinations = true;
 	var $types = $('.types');
@@ -33,56 +69,107 @@ $(function () {
 	var Vent = _.extend({}, Backbone.Events);
 
 	var LocationModel = Backbone.Model.extend({
-		initialize: function () {
-			var polyCoords = this.get('latlngarray');
+    initialize: function() {
+        var polyCoords = this.get('latlngarray');
 
-			var marker = new google.maps.Polygon({
-				paths: polyCoords,
-				strokeColor: '#' + this.get('strokecolor'),
-				strokeOpacity: 0.8,
-				strokeWeight: 2,
-				fillColor: '#' + this.get('fillcolor'),
-				fillOpacity: 0.35,
-				zIndex: this.get('order') || 0,
-			});
+        // Create the polygon marker
+        var marker = new google.maps.Polygon({
+            paths: polyCoords,
+            strokeColor: '#' + this.get('strokecolor'),
+            strokeOpacity: 0.8,
+            strokeWeight: 2,
+            fillColor: '#' + this.get('fillcolor'),
+            fillOpacity: 0.35,
+            zIndex: this.get('order') || 0,
+        });
 
-			var bounds = new google.maps.LatLngBounds();
-			polyCoords.forEach(function (element, index) {
-				bounds.extend(element);
-			});
+        // Calculate bounds for label positioning
+        var bounds = new google.maps.LatLngBounds();
+        polyCoords.forEach(function(element, index) {
+            bounds.extend(element);
+        });
 
-			var mapLabel = new MapLabel({
-				position: bounds.getCenter(),
-				text: this.get('title'),
-				strokeWeight: 1,
-				strokeColor: '#000000',
-				fontColor: '#' + this.get('fillcolor'),
-				zIndex: 10000,
-			});
+        // Create the map label
+        var mapLabel = new MapLabel({
+            position: bounds.getCenter(),
+            text: this.get('title'),
+            strokeWeight: 1,
+            strokeColor: '#000000',
+            fontColor: '#' + this.get('fillcolor'),
+            zIndex: 10000,
+        });
 
-			_.bindAll(this, 'markerClicked');
-			google.maps.event.addListener(marker, 'click', this.markerClicked);
-			this.set({ marker: marker, label: mapLabel });
-		},
+        // Store reference to the collection (category)
+        this.collection = this.collection || {};
+        this.category = this.collection.category;
 
-		markerClicked: function () {
-			Vent.trigger('location:clicked', this);
-		},
+        // Bind methods and set up event listeners
+        _.bindAll(this, 'markerClicked', 'updateVisuals');
+        google.maps.event.addListener(marker, 'click', this.markerClicked);
+        
+        // Store references to marker and label
+        this.set({ 
+            marker: marker, 
+            label: mapLabel,
+            originalData: this.toJSON() // Store original data for potential reset
+        });
 
-		removeHighlight: function () { },
+        // Listen for changes to update visuals
+        this.on('change:fillcolor change:strokecolor change:title', this.updateVisuals);
+    },
 
-		highlightMarker: function () {
-			if (currentMarker == this) {
-				Vent.trigger('location:clicked', this);
-			} else {
-				if (currentMarker) {
-					currentMarker.removeHighlight();
-				}
-				mapView.closePopupLocation();
-				currentMarker = this;
-			}
-		},
-	});
+    markerClicked: function() {
+        Vent.trigger('location:clicked', this);
+    },
+
+    removeHighlight: function() {
+        // Optional: Implement if you need highlight removal logic
+    },
+
+    highlightMarker: function() {
+        if (currentMarker == this) {
+            Vent.trigger('location:clicked', this);
+        } else {
+            if (currentMarker) {
+                currentMarker.removeHighlight();
+            }
+            mapView.closePopupLocation();
+            currentMarker = this;
+        }
+    },
+
+    updateVisuals: function() {
+        // Update polygon appearance
+        this.get('marker').setOptions({
+            fillColor: '#' + this.get('fillcolor'),
+            strokeColor: '#' + this.get('strokecolor')
+        });
+
+        // Update label appearance
+        this.get('label').set({
+            text: this.get('title'),
+            fontColor: '#' + this.get('fillcolor')
+        });
+    },
+
+    // Helper method to get clean data for export
+    toCleanJSON: function() {
+        return {
+            title: this.get('title'),
+            notes: this.get('notes'),
+            order: this.get('order'),
+            strokecolor: this.get('strokecolor'),
+            fillcolor: this.get('fillcolor'),
+            latlngarray: this.get('latlngarray'),
+            // Add any other relevant properties
+        };
+    },
+
+    // Reset to original data
+    reset: function() {
+        this.set(this.get('originalData'));
+    }
+});
 	var LocationsCollection = Backbone.Collection.extend({
 		model: LocationModel,
 	});
@@ -544,85 +631,90 @@ $(function () {
 			});
 		},
 
-		popupLocation: function (location, panTo) {
-			// Get location data and enhance it with gang information
-			var locationData = location.toJSON();
-			locationData.gangs = gangs; // gangs from gangs.js
-
-			// Determine current gang from notes or default to Neutral
-			var currentGangColor = "FFFFFF"; // Default to neutral/white
-			if (locationData.notes && locationData.notes.includes("Gang:")) {
-				var gangName = locationData.notes.split("Gang:")[1].trim();
-				var gang = getGangByName(gangName);
-				if (gang) {
-					currentGangColor = gang.color;
-				}
-			}
-			locationData.currentGangColor = currentGangColor;
-
-			// Create info window with enhanced template data
-			var infoWindow = new google.maps.InfoWindow({
-				content: this.popupTemplate(locationData)
-			});
-
-			// Set info window options
-			infoWindow.setOptions({
-				maxHeight: 400
-			});
-
-			// Adjust for mobile devices
-			if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-				infoWindow.setOptions({
-					maxWidth: 180,
-					maxHeight: 300
-				});
-			}
-
-			// Calculate center position for the info window
-			var bounds = new google.maps.LatLngBounds();
-			location.get('marker').getPath().forEach(function (element, index) {
-				bounds.extend(element);
-			});
-			infoWindow.setPosition(bounds.getCenter());
-			infoWindow.open(this.map);
-
-			// Add event listener for when the info window DOM is ready
-			google.maps.event.addListener(infoWindow, 'domready', () => {
-				// Update description when gang selection changes
-				$('.gang-selector').change(function () {
-					var selectedColor = $(this).val();
-					var selectedGang = getGangByColor(selectedColor);
-					$('.gang-description').text(selectedGang.description);
-				});
-
-				// Save button click handler
-				$('.save-gang').click(() => {
-					var selectedColor = $('.gang-selector').val();
-					var selectedGang = getGangByColor(selectedColor);
-
-					// Update the polygon visual appearance
-					location.get('marker').setOptions({
-						fillColor: '#' + selectedColor,
-						strokeColor: '#' + selectedColor
-					});
-
-					// Update the label color
-					location.get('label').set('fontColor', '#' + selectedColor);
-
-					// Update the model data
-					location.set('notes', 'Gang: ' + selectedGang.name);
-					location.set('fillcolor', selectedColor);
-					location.set('strokecolor', selectedColor);
-
-					// Close the info window
-					infoWindow.close();
-				});
-			});
-
-			// Close any existing info window and store reference to this one
-			this.closePopupLocation();
-			this.currentInfoWindow = infoWindow;
-		},
+		popupLocation: function(location, panTo) {
+    // Close any existing info window
+    this.closePopupLocation();
+    
+    // Store reference to current location
+    this.currentLocation = location;
+    
+    // Get location data
+    var locationData = location.toJSON();
+    
+    // Calculate center position for the map
+    var bounds = new google.maps.LatLngBounds();
+    location.get('marker').getPath().forEach(function(element, index) {
+        bounds.extend(element);
+    });
+    
+    // Pan to the area (optional)
+    if (panTo !== false) {
+        this.map.panTo(bounds.getCenter());
+    }
+    
+    // Open the sidebar with this location's data
+    openSidebar(location);
+    
+    // Store reference to current location
+    this.currentLocation = location;
+    
+    // If you still want to maintain info window functionality as fallback:
+    var locationData = location.toJSON();
+    locationData.gangs = gangs;
+    
+    // Determine current gang from notes or default to Neutral
+    var currentGangColor = "FFFFFF";
+    if (locationData.notes && locationData.notes.includes("Gang:")) {
+        var gangName = locationData.notes.split("Gang:")[1].trim();
+        var gang = getGangByName(gangName);
+        if (gang) {
+            currentGangColor = gang.color;
+        }
+    }
+    locationData.currentGangColor = currentGangColor;
+    
+    // Create info window (as fallback or alternative view)
+    var infoWindow = new google.maps.InfoWindow({
+        content: this.popupTemplate(locationData),
+        position: bounds.getCenter()
+    });
+    
+    // Store reference to info window
+    this.currentInfoWindow = infoWindow;
+    
+    // If you want to show both sidebar and info window (comment out if not needed)
+    // infoWindow.open(this.map);
+    
+    // Event listeners for info window (if kept)
+    google.maps.event.addListener(infoWindow, 'domready', () => {
+        $('.gang-selector').change(function() {
+            var selectedColor = $(this).val();
+            var selectedGang = getGangByColor(selectedColor);
+            $('.gang-description').text(selectedGang.description);
+        });
+        
+        $('.save-gang').click(() => {
+            var selectedColor = $('.gang-selector').val();
+            var selectedGang = getGangByColor(selectedColor);
+            
+            location.get('marker').setOptions({
+                fillColor: '#' + selectedColor,
+                strokeColor: '#' + selectedColor
+            });
+            
+            location.get('label').set('fontColor', '#' + selectedColor);
+            
+            location.set({
+                notes: 'Gang: ' + selectedGang.name,
+                fillcolor: selectedColor,
+                strokecolor: selectedColor
+            });
+            
+            infoWindow.close();
+            document.getElementById('sidebar').classList.remove('open');
+        });
+    });
+},
 	});
 
 	var mapView = new MapView({
@@ -637,6 +729,69 @@ $(function () {
 	sections.fetch();
 	mapView.render();
 	categoriesView.render();
+
+	// Sidebar event listeners
+const sidebar = document.getElementById('sidebar');
+
+document.querySelector('.close-sidebar').addEventListener('click', () => {
+  sidebar.classList.remove('open');
+});
+
+document.getElementById('cancel-edit').addEventListener('click', () => {
+  sidebar.classList.remove('open');
+});
+
+document.getElementById('save-area').addEventListener('click', () => {
+  const locationId = sidebar.dataset.locationId;
+  const locationModel = mapView.currentLocation;
+  
+  if (locationModel) {
+    const newName = document.getElementById('area-name').value;
+    const newGangColor = document.getElementById('gang-selector').value;
+    const newNotes = document.getElementById('area-notes').value;
+    const newGang = gangs.find(g => g.color === newGangColor);
+    
+    // Update the model
+    locationModel.set({
+      title: newName,
+      notes: newGang ? `Gang: ${newGang.name}\n${newNotes}` : newNotes,
+      fillcolor: newGangColor,
+      strokecolor: newGangColor
+    });
+    
+    // Update the visual representation
+    locationModel.get('marker').setOptions({
+      fillColor: '#' + newGangColor,
+      strokeColor: '#' + newGangColor
+    });
+    
+    // Update the label color
+    locationModel.get('label').set('fontColor', '#' + newGangColor);
+    
+    sidebar.classList.remove('open');
+  }
+});
+
+document.getElementById('export-area').addEventListener('click', () => {
+  const locationModel = mapView.currentLocation;
+  if (locationModel) {
+    const areaData = locationModel.toJSON();
+    downloadJSON(areaData, `${areaData.title.replace(/\s+/g, '_')}.json`);
+  }
+});
+
+document.getElementById('export-all').addEventListener('click', () => {
+  // Get all locations from your data structure
+  const allLocations = sections.chain()
+    .map(s => s.categories.models)
+    .flatten()
+    .map(c => c.locations.models)
+    .flatten()
+    .map(l => l.toJSON())
+    .value();
+  
+  downloadJSON(allLocations, 'all_areas.json');
+});
 });
 
 // function printArray() {

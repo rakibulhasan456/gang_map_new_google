@@ -161,6 +161,37 @@
         </div>
     </div>
 </script>
+
+<!-- Sidebar Structure -->
+<div id="sidebar" class="sidebar">
+  <div class="sidebar-header">
+    <h3 id="sidebar-title">Area Information</h3>
+    <button class="close-sidebar">&times;</button>
+  </div>
+  <div class="sidebar-content">
+    <div class="form-group">
+      <label>Area Name:</label>
+      <input type="text" id="area-name" class="form-control">
+    </div>
+    <div class="form-group">
+      <label>Held by:</label>
+      <select id="gang-selector" class="form-control">
+        <option value="FFFFFF">Neutral</option>
+        <!-- Options will be populated by JavaScript -->
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Notes:</label>
+      <textarea id="area-notes" class="form-control" rows="3"></textarea>
+    </div>
+    <div class="button-group">
+      <button id="save-area" class="btn btn-primary">Save</button>
+      <button id="cancel-edit" class="btn btn-secondary">Cancel</button>
+      <button id="export-area" class="btn btn-info">Add Area</button>
+      <button id="export-all" class="btn btn-success">Add All Areas</button>
+    </div>
+  </div>
+</div>
 	
 
 	<div id="typeDetails" class="types"></div>
