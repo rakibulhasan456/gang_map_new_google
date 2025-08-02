@@ -340,6 +340,7 @@ body > header > p > a:hover {
 }
 
 /* Sidebar Styles */
+/* Sidebar Styles */
 .sidebar {
   position: fixed;
   top: 0;
@@ -347,7 +348,7 @@ body > header > p > a:hover {
   width: 400px;
   height: 100%;
   background: white;
-  box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+  box-shadow: -2px 0 10px rgba(0,0,0,0.2);
   transition: right 0.3s ease;
   z-index: 1000;
   overflow-y: auto;
@@ -372,6 +373,7 @@ body > header > p > a:hover {
   color: white;
   font-size: 24px;
   cursor: pointer;
+  line-height: 1;
 }
 
 .sidebar-content {
@@ -379,23 +381,122 @@ body > header > p > a:hover {
 }
 
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: 8px;
   font-weight: bold;
+  color: #333;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.gang-info {
+  background: #f9f9f9;
+  padding: 12px;
+  border-radius: 4px;
+  border-left: 3px solid #27b298;
+}
+
+.gang-description {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+
+.coordinates-info {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+}
+
+.coordinates-display {
+  max-height: 150px;
+  overflow-y: auto;
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 
 .button-group {
-  margin-top: 20px;
-  display: flex;
-  flex-wrap: wrap;
+  margin-top: 25px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
 .button-group button {
-  flex: 1;
-  min-width: 120px;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background-color 0.2s;
+}
+
+.button-group button i {
+  font-size: 14px;
+}
+
+#save-area {
+  background: #27b298;
+  color: white;
+}
+
+#save-area:hover {
+  background: #1e9c84;
+}
+
+#cancel-edit {
+  background: #6c757d;
+  color: white;
+}
+
+#cancel-edit:hover {
+  background: #5a6268;
+}
+
+#export-area {
+  background: #17a2b8;
+  color: white;
+}
+
+#export-area:hover {
+  background: #138496;
+}
+
+#export-all {
+  background: #28a745;
+  color: white;
+}
+
+#export-all:hover {
+  background: #218838;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    right: -100%;
+  }
+  
+  .button-group {
+    grid-template-columns: 1fr;
+  }
 }
